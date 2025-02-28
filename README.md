@@ -1,15 +1,14 @@
-{
-# Clore Hyra Script README
+
 
 This Python script interacts with [Clore AI Marketplace](https://clore.ai/) to:
-1. Retrieve a list of GPU servers available for rent.
+1. Retrieve a list of GPU servers available for rent **to [btc-hunters.com](https://btc-hunters.com),** comparing the best bk/s-per-USD price.
 2. Compare prices and performance (bk/s) with your active orders.
 3. Generate a detailed HTML report including tables, charts, and (optionally) a hashpower graph.
 
 ## Customization
 All customizable settings are located at the top of the script. These include:
 - **User Identity:**  
-  `USER_IDENTITY = "Ollebolle22 fa35e84c8d9fe32ed99c46b76a2c3b0568480491c2223ed6f8321165fe95486e"`  
+  `USER_IDENTITY = "Ollebolle22 fa35e84c8d9fe32ed99c46b76a2c3b0568480491c2223ed6f8321165fe95486e"`  <--- use your own!
   *(Example – change to your own from btchunters.com)*
 - **API Key:**  
   `API_KEY = "YOUR_CLORE_API_KEY_HERE"`
