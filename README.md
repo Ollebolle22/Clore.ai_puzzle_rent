@@ -5,23 +5,30 @@ This Python script interacts with [Clore AI Marketplace](https://clore.ai/) to:
 2. Compare prices and performance (bk/s) with your active orders.
 3. Generate a detailed HTML report including tables, charts, and (optionally) a hashpower graph.
 
+
+
 ## Customization
 All customizable settings are located at the top of the script. These include:
 - **User Identity:**  
-  `USER_IDENTITY = "Ollebolle22 fa35e84c8d9fe32ed99c46b76a2c3b0568480491c2223ed6f8321165fe95486e"`  <--- use your own!
+  `USER_IDENTITY = "Ollebolle22 fa35e84c8d9fe32ed99c46b76a2c3b0568480491c2223ed6f8321165fe95486e"`
   *(Example – change to your own from btchunters.com)*
+  
 - **API Key:**  
   `API_KEY = "YOUR_CLORE_API_KEY_HERE"`
+  
 - **Jupyter Token and SSH Password:**  
   `JUPYTER_TOKEN = "example_token"`  
   `SSH_PASSWORD = "example_password"`
+  
 - **File Paths:**  
   `CACHE_FILE = "marketplace_cache.json"`  
   `HISTORY_FILE = "clore_history.log"`  
   `RESULT_HTML_FILE = "clore_rent_results.html"`  
   `MEASUREMENTS_FILE = "measurements.json"`
+  
 - **Other Settings:**  
   `COOLDOWN = 600` *(cache cooldown in seconds)*
+  
 - **Local Currency Conversion:**  
   The function `get_sek_rate()` fetches the USD→SEK exchange rate and can be modified for other local currencies.
 
