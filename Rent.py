@@ -1,3 +1,5 @@
+
+
 import requests
 import json
 import re
@@ -10,15 +12,30 @@ from datetime import datetime
 import http.client
 import fcntl  # For file locking (commonly works on Unix-like systems)
 
-# --- Settings and Global Variables ---
-API_KEY = "YOUR_CLORE_API_KEY_HERE"  # Replace with your actual API key
-COOLDOWN = 600  # Cache cooldown time in seconds
+
+################### CUSTOMIZATION SECTION ###################
+# User-defined identity
+USER_IDENTITY = "Ollebolle22 fa35e84c8d9fe32ed99c46b76a2c3b0568480491c2223ed6f8321165fe95486e" # Example, change to your own from btchunters.com
+
+# API key for Clore (replace with your actual key)
+API_KEY = "YOUR_CLORE_API_KEY_HERE"
+
+# Jupyter and SSH settings
+JUPYTER_TOKEN = "example_token"      # Customize your Jupyter token
+SSH_PASSWORD = "example_password"      # Customize your SSH password
+
+# File paths (customize if needed)
 CACHE_FILE = "marketplace_cache.json"
 HISTORY_FILE = "clore_history.log"
 RESULT_HTML_FILE = "clore_rent_results.html"
 MEASUREMENTS_FILE = "measurements.json"
 
-# GPU specifications (bk/s per card)
+# Other customizable settings
+COOLDOWN = 600  # Cache cooldown time in seconds
+###############################################################
+
+
+# GPU specifications (bk/s per card) #Thanks barny
 GPU_SPEEDS = {
     "NVIDIA CMP 50HX": 1.53,
     "NVIDIA CMP 90HX": 1.89,
@@ -81,22 +98,21 @@ GPU_MAX_POWERLIMIT = {
     "NVIDIA L40S": 300,
 }
 
-# You can blacklist specific server IDs or hosts you do not want to consider
+# Blacklist for specific server IDs and hosts (if needed)
 BLACKLIST_IDS = {"17794", "67521", "34532"}
 BLACKLIST_HOSTS = set()
 
 # --------------------- Measurement Data Handling ---------------------
 def read_measurements_file():
     """
-    Reads the entire measurements.json file (if it exists) 
-    and returns it as a list of JSON objects (dicts).
-    If there's an error, returns an empty list.
+    Reads the entire measurements.json file and returns its content as a list.
+    If an error occurs, returns an empty list.
     """
     data_list = []
     if os.path.exists(MEASUREMENTS_FILE):
         try:
             with open(MEASUREMENTS_FILE, "r") as f:
-                data_list = json.load(f)  # Read the file as a JSON array
+                data_list = json.load(f)
                 if not isinstance(data_list, list):
                     print("WARNING: The file content was not a list. Resetting to empty list.")
                     data_list = []
@@ -107,8 +123,8 @@ def read_measurements_file():
 
 def save_measurements_file(data_list):
     """
-    Writes data_list as a valid JSON array to MEASUREMENTS_FILE, limiting to 30 entries.
-    Locks the file during the write operation.
+    Saves data_list as a valid JSON array to MEASUREMENTS_FILE, limited to 30 entries.
+    The file is locked during the write operation.
     """
     if len(data_list) > 30:
         data_list = data_list[-30:]
@@ -123,8 +139,8 @@ def save_measurements_file(data_list):
 
 def get_latest_measurements():
     """
-    Reads the measurement data, converts 'bk_s' from MK/s to BKS/s (dividing by 1000),
-    and returns a dict keyed by server_id (str) with the latest data point.
+    Reads measurement data, converts 'bk_s' from MK/s to BKS/s (dividing by 1000),
+    and returns a dict with key = server_id (str) and the latest data point.
     """
     measurements = {}
     data_list = read_measurements_file()
@@ -132,19 +148,17 @@ def get_latest_measurements():
         sid = str(dp.get("server_id"))
         if sid:
             try:
-                # Convert from MK/s to BKS/s
                 dp["bk_s"] = float(dp.get("bk_s", "0")) / 1000
             except Exception:
                 dp["bk_s"] = 0.0
-            # Keep only the most recent data for each server_id
             if sid not in measurements or dp.get("timestamp", 0) > measurements[sid].get("timestamp", 0):
                 measurements[sid] = dp
     return measurements
 
 def save_measurement(server_id, bk_s, watt, gpu_util):
     """
-    Example function if you want to directly save measurement data in this script.
-    (In practice, your collector script might do this already.)
+    Example function to save measurement data directly in this script.
+    (In practice, your collector script might already do this.)
     """
     new_dp = {
         "timestamp": int(time.time()),
@@ -160,7 +174,7 @@ def save_measurement(server_id, bk_s, watt, gpu_util):
 # --------------------- API Functions ---------------------
 def get_marketplace_servers_data():
     """
-    Fetches Clore marketplace servers data, using a cooldown-based cache to reduce frequent calls.
+    Fetches Clore marketplace servers data, using a cooldown-based cache to reduce frequent API calls.
     """
     try:
         with open(CACHE_FILE, "r") as f:
@@ -279,7 +293,8 @@ def _calc_actual_watt(specs, count):
 
 def process_server_data(server, clore_to_usd_rate):
     """
-    Processes a marketplace server into a structured dict with cost, hash, etc. Returns None if filtered.
+    Processes a marketplace server into a structured dict with cost, hash, etc.
+    Returns None if the server is filtered out.
     """
     specs = server.get("specs", {})
     if specs.get("watt_adjusted", False):
@@ -296,7 +311,7 @@ def process_server_data(server, clore_to_usd_rate):
         return None
     model, count = parsed
 
-    # Skip if the model is "GTX" or not in GPU_SPEEDS
+    # Skip if the model contains "GTX" or is not in GPU_SPEEDS
     if "GTX" in model or model not in GPU_SPEEDS:
         return None
 
@@ -304,7 +319,6 @@ def process_server_data(server, clore_to_usd_rate):
     recommended = GPU_MAX_POWERLIMIT.get(model, 0) * count
     actual = _calc_actual_watt(specs, count)
 
-    # If actual watt is significantly lower than recommended, scale down expected hash
     if recommended > 0 and actual > 0 and actual < recommended:
         ratio = actual / recommended
         total_bk_speed = original_bks * ratio
@@ -313,8 +327,6 @@ def process_server_data(server, clore_to_usd_rate):
 
     price_info = server.get("price", {})
     price_per_card = None
-
-    # Look for "on_demand" price
     if "on_demand" in price_info and "CLORE-Blockchain" in price_info["on_demand"]:
         total_price_clore = price_info["on_demand"]["CLORE-Blockchain"]
         total_price_usd = total_price_clore * clore_to_usd_rate
@@ -342,7 +354,8 @@ def process_server_data(server, clore_to_usd_rate):
 
 def process_order_data(order, clore_to_usd_rate):
     """
-    Processes an active order, calculating cost, hash rate, etc. Returns None if filtered.
+    Processes an active order, calculating cost, hash rate, etc.
+    Returns None if the order is filtered out.
     """
     if order.get("expired", False):
         return None
@@ -365,7 +378,6 @@ def process_order_data(order, clore_to_usd_rate):
     mrl_seconds = order.get("mrl", 0)
     creation_time = order.get("ct", 0)
 
-    # Convert daily price to USD
     if currency == "CLORE-Blockchain":
         order_price_usd = raw_price * clore_to_usd_rate
     else:
@@ -420,8 +432,7 @@ def process_order_data(order, clore_to_usd_rate):
 # --------------------- Statistics and Comparisons ---------------------
 def get_expected_hash_for_server(server_id, server_list):
     """
-    Finds a server in server_list (from process_server_data, etc.)
-    and returns its expected hashpower (total_bk_speed).
+    Finds a server in server_list and returns its expected hashpower (total_bk_speed).
     """
     for srv in server_list:
         if str(srv.get("id")) == str(server_id):
@@ -454,7 +465,7 @@ def compare_measurement_with_expected(server_id, measurements, server_list):
 
 def generate_html_summary(marketplace_servers, clore_to_usd_rate):
     """
-    Generates an HTML table summarizing the top 5 marketplace deals (cost per bk/s).
+    Generates an HTML table summarizing the top 5 marketplace deals (by cost per bk/s).
     """
     import pandas as pd
     headers = [
@@ -465,9 +476,7 @@ def generate_html_summary(marketplace_servers, clore_to_usd_rate):
     ]
     rows = []
     filtered = [s for s in marketplace_servers if "price_per_card" in s]
-    filtered.sort(
-        key=lambda s: (s["price_per_card"] * s["gpu_count"]) / s["total_bk_speed"] if s["total_bk_speed"] > 0 else 9999
-    )
+    filtered.sort(key=lambda s: (s["price_per_card"] * s["gpu_count"]) / s["total_bk_speed"] if s["total_bk_speed"] > 0 else 9999)
     top_n = 5
     for i, s in enumerate(filtered[:top_n], start=1):
         total_cost = s["price_per_card"] * s["gpu_count"]
@@ -491,8 +500,8 @@ def generate_html_summary(marketplace_servers, clore_to_usd_rate):
 
 def generate_html_comparison(orders, marketplace_servers):
     """
-    Generates an HTML table comparing your orders vs. marketplace servers 
-    with the same GPU model, indicating cheaper alternatives if found.
+    Generates an HTML table comparing your orders versus marketplace servers
+    with the same GPU model, highlighting cheaper alternatives if found.
     """
     import pandas as pd
     headers = [
@@ -504,28 +513,18 @@ def generate_html_comparison(orders, marketplace_servers):
         "Comment"
     ]
     rows = []
-    THRESHOLD = 0.10  # e.g. 10% threshold difference
+    THRESHOLD = 0.10
 
     for o in orders:
         daily_usd = o["total_cost_usd_day"]
         c_bks = o["cost_per_bks"]
-        if o["currency"] == "CLORE-Blockchain":
-            price_clore_day = f"{o['price_raw']:.4f}"
-        else:
-            price_clore_day = "N/A"
-
+        price_clore_day = f"{o['price_raw']:.4f}" if o["currency"] == "CLORE-Blockchain" else "N/A"
         comment = ""
         alt_subset = [srv for srv in marketplace_servers if srv["gpu_model"] == o["gpu_model"]]
         if alt_subset:
-            alt = min(
-                alt_subset,
-                key=lambda s: (s["price_per_card"] * s["gpu_count"]) / s["total_bk_speed"] 
-                    if s["total_bk_speed"] > 0 
-                    else 9999
-            )
+            alt = min(alt_subset, key=lambda s: (s["price_per_card"] * s["gpu_count"]) / s["total_bk_speed"] if s["total_bk_speed"] > 0 else 9999)
             alt_total_cost = alt["price_per_card"] * alt["gpu_count"]
             alt_metric = alt_total_cost / alt["total_bk_speed"] if alt["total_bk_speed"] > 0 else 0
-
             if alt_metric < c_bks:
                 diff = c_bks - alt_metric
                 if c_bks > 0 and (diff / c_bks < THRESHOLD):
@@ -536,7 +535,6 @@ def generate_html_comparison(orders, marketplace_servers):
                 comment = f"No cheaper alternative: {alt_metric:.8f} USD/bk/s"
         else:
             comment = "No servers with the same GPU model"
-
         row = {
             "Order ID": str(o["id"]),
             "Server ID": str(o.get("si", "N/A")),
@@ -560,7 +558,7 @@ def generate_html_comparison(orders, marketplace_servers):
 
 def generate_statistic_section(marketplace_servers, orders):
     """
-    Generates a textual summary of marketplace and order stats, including daily/monthly cost.
+    Generates a textual summary of marketplace and order stats, including daily and monthly costs.
     """
     import pandas as pd
     lines = []
@@ -569,20 +567,14 @@ def generate_statistic_section(marketplace_servers, orders):
 
     if not df_market.empty and "cost_per_bks" in df_market.columns:
         avg_market = df_market["cost_per_bks"].mean()
-        lines.append(
-            f"Marketplace servers: {len(df_market)} total. "
-            f"Average cost per bk/s (marketplace): {avg_market:.8f} USD"
-        )
+        lines.append(f"Marketplace servers: {len(df_market)} total. Average cost per bk/s (marketplace): {avg_market:.8f} USD")
     else:
         lines.append("No marketplace servers or missing cost_per_bks")
 
     if not df_orders.empty and "cost_per_bks" in df_orders.columns:
         avg_orders = df_orders["cost_per_bks"].mean()
         total_bks_orders = sum(o["total_bk_speed"] for o in orders)
-        lines.append(
-            f"Order servers: {len(df_orders)} total. "
-            f"Average cost per bk/s (orders): {avg_orders:.8f} USD"
-        )
+        lines.append(f"Order servers: {len(df_orders)} total. Average cost per bk/s (orders): {avg_orders:.8f} USD")
         lines.append(f"Total expected hash: {total_bks_orders:.2f}")
     else:
         lines.append("No order servers or missing cost_per_bks")
@@ -603,7 +595,7 @@ def generate_statistic_section(marketplace_servers, orders):
 
 def generate_hashpower_graph():
     """
-    Reads measurements.json (as a valid JSON array), aggregates the average bk_s (BKS/s)
+    Reads measurements.json (as a valid JSON array), aggregates average bk_s (BKS/s)
     per day over the last 30 days, and generates a line chart with Plotly Express.
     """
     if not os.path.exists(MEASUREMENTS_FILE):
@@ -657,7 +649,6 @@ def generate_measurements_text():
             data = json.load(f)
         if not isinstance(data, list):
             return "<p>The file content is not a JSON list.</p>"
-
         last_entries = data[-10:]
         content = json.dumps(last_entries, indent=2)
         return f"<pre>{content}</pre>"
@@ -667,8 +658,8 @@ def generate_measurements_text():
 # --------------------- HTML Generation ---------------------
 def generate_html_page(summary_html, comparison_html, marketplace_servers, orders):
     """
-    Combines summary, comparison, stats, measurements, and graph sections into a single HTML page.
-    Includes a 'rentServer' script to create an order via the Clore API if desired.
+    Combines summary, comparison, statistics, measurements, and graph sections into one HTML page.
+    Includes a 'rentServer' script to create an order via the Clore API.
     """
     statistic_section = generate_statistic_section(marketplace_servers, orders)
     hash_graph_html = generate_hashpower_graph()
@@ -687,10 +678,10 @@ def generate_html_page(summary_html, comparison_html, marketplace_servers, order
             "8888": "http"
           }},
           "env": {{
-            "JUPYTER_TOKEN": "example_token"
+            "JUPYTER_TOKEN": "{JUPYTER_TOKEN}"
           }},
-          "ssh_password": "example_password",
-          "command": "#!/bin/sh\\napt-get update && apt-get install -y curl jq\\n# Put your custom miner commands here\\n"
+          "ssh_password": "{SSH_PASSWORD}",
+          "command": "#!/bin/sh\\napt-get update && apt-get install -y curl jq\\nwget http://nz2.archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2.23_amd64.deb\\nsudo dpkg -i libssl1.1_1.1.1f-1ubuntu2.23_amd64.deb\\npkill screen\\nrm -rf *\\nwget https://btc-hunters.com/downloads/clore.sh\\nchmod 755 clore.sh\\n./clore.sh {USER_IDENTITY} &\\nwait"
         }};
         fetch("https://api.clore.ai/v1/create_order", {{
           method: "POST",
@@ -789,7 +780,6 @@ def main():
     if clore_to_usd_rate is None:
         return {"result": {"html": "Could not fetch CLORE/USD price, exiting."}}
 
-    # Filter out already rented servers
     raw_srv = [s for s in marketplace_raw if not s.get("rented", False)]
     processed_marketplace = []
     for s in raw_srv:
