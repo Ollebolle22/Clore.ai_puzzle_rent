@@ -1,3 +1,18 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# Copyright (c) 2025 Emil Norrhage. All rights reserved.
+#
+# This file is part of Clore.ai_puzzle_rent.
+#
+# Licensed under the Mozilla Public License 2.0 (MPL-2.0); you may use, modify, and distribute
+# this file freely as long as you comply with the terms of the MPL-2.0.
+# You can obtain a copy of the License at:
+# http://mozilla.org/MPL/2.0/.
+#
+# Author: Emil Norrhage <emil@norrhage.se>
+#
+# I kindly grant permission to anyone to use these files as they wish.
 
 
 import requests
